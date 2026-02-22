@@ -1,5 +1,7 @@
 ﻿const LANGUAGE_BY_FILE = {
+    js: 'javascript',
     jsx: 'javascript',
+    tsx: 'typescript',
     css: 'css',
     html: 'html'
 };

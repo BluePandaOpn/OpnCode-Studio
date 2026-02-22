@@ -1,9 +1,39 @@
-﻿import { DEFAULT_CODES, FILE_LABELS, PREVIEW_AUTO_REFRESH_MS, TEMPLATES } from './core/constants.js';
+﻿import {
+    DEFAULT_CODES,
+    PREVIEW_AUTO_REFRESH_MS,
+    TEMPLATES,
+    getGoalPreset,
+    getModeConfig,
+    getQuickCasesByMode
+} from './core/constants.js';
 import { createEditor } from './core/editor.js';
 import { createLayout } from './core/layout.js';
-import { buildDownloadHtml, createPreviewMessageHandler, renderProject } from './core/preview.js';
-import { clearWorkspaceStorage, loadSplitSizes, loadWorkspace, saveSplitSizes, saveWorkspace } from './core/storage.js';
-import { appendConsoleLine, clearConsole, getDom, setActiveTab, setConsoleVisibility, setStatus } from './ui/dom.js';
+import { buildDownloadHtml, createPreviewMessageHandler, renderProject, resolveRuntimeMode } from './core/preview.js';
+import {
+    clearWorkspaceStorage,
+    createProject,
+    deleteProject,
+    exportStoragePayload,
+    getActiveProjectIdSafe,
+    importStoragePayload,
+    listProjects,
+    loadSplitSizes,
+    loadWorkspace,
+    saveSplitSizes,
+    saveWorkspace,
+    setActiveProject
+} from './core/storage.js';
+import {
+    appendConsoleLine,
+    clearConsole,
+    getDom,
+    renderProjectOptions,
+    renderQuickCaseOptions,
+    setActiveMode,
+    setActiveTab,
+    setConsoleVisibility,
+    setStatus
+} from './ui/dom.js';
 
 const state = {
     workspace: loadWorkspace(),
@@ -18,10 +48,48 @@ const state = {
 
 const dom = getDom();
 
+function getMode() {
+    return getModeConfig(state.workspace.mode);
+}
+
+function getFileKey(tabKey = state.workspace.currentTab) {
+    if (tabKey === 'primary') return getMode().primaryKey;
+    return tabKey;
+}
+
+function persistWorkspace() {
+    saveWorkspace(state.workspace);
+}
+
 function render() {
     clearConsole(dom);
-    renderProject(dom.frame, state.workspace.codes);
-    setStatus(dom, 'Preview updated');
+    renderProject(dom.frame, state.workspace);
+    setStatus(dom, `Preview updated (${getMode().id})`);
+}
+
+function runCurrentModeOnly() {
+    clearConsole(dom);
+    const runtimeMode = resolveRuntimeMode(state.workspace.mode, state.workspace.codes);
+    renderProject(dom.frame, state.workspace, { forcedRuntimeMode: runtimeMode });
+    setStatus(dom, `Run mode: ${runtimeMode}`);
+}
+
+function repairCurrentPrimaryCode() {
+    const key = getMode().primaryKey;
+    state.workspace.codes[key] = DEFAULT_CODES[key] || '';
+    state.workspace.currentTab = 'primary';
+    persistWorkspace();
+    switchTab('primary');
+    render();
+    setStatus(dom, `Repair complete: ${getMode().primaryLabel}`);
+}
+
+function refreshProjectSelector() {
+    renderProjectOptions(dom, listProjects(), getActiveProjectIdSafe());
+}
+
+function refreshQuickCaseSelector() {
+    renderQuickCaseOptions(dom, getQuickCasesByMode(state.workspace.mode));
 }
 
 function updateAutoRefreshButton() {
@@ -29,41 +97,80 @@ function updateAutoRefreshButton() {
 }
 
 function startAutoRefresh() {
-    if (state.autoRefreshTimerId) {
-        window.clearInterval(state.autoRefreshTimerId);
-    }
+    if (state.autoRefreshTimerId) window.clearInterval(state.autoRefreshTimerId);
     state.autoRefreshTimerId = window.setInterval(() => {
-        if (state.autoRefreshEnabled) {
-            render();
-        }
+        if (state.autoRefreshEnabled) render();
     }, PREVIEW_AUTO_REFRESH_MS);
 }
 
-function persistWorkspace() {
-    saveWorkspace(state.workspace);
-}
+function switchTab(tabKey) {
+    state.workspace.currentTab = tabKey;
+    const fileKey = getFileKey(tabKey);
 
-function switchFile(file) {
-    state.workspace.currentFile = file;
-    setActiveTab(dom, file, FILE_LABELS);
-
+    setActiveTab(dom, tabKey, getMode().primaryLabel);
     if (state.editor) {
-        state.editor.setValue(state.workspace.codes[file] || '');
-        state.switchLanguage(file);
+        state.editor.setValue(state.workspace.codes[fileKey] || '');
+        state.switchLanguage(fileKey);
     }
 
     persistWorkspace();
-    setStatus(dom, `Editing ${FILE_LABELS[file] || file}`);
+    setStatus(dom, `Editing ${dom.activeFileLabel.textContent}`);
+}
+
+function applyMode(modeId) {
+    state.workspace.mode = modeId;
+    setActiveMode(dom, modeId);
+    if (state.workspace.currentTab !== 'primary') {
+        state.workspace.currentTab = 'primary';
+    }
+
+    const primaryKey = getMode().primaryKey;
+    if (!String(state.workspace.codes[primaryKey] || '').trim()) {
+        state.workspace.codes[primaryKey] = DEFAULT_CODES[primaryKey] || '';
+    }
+
+    refreshQuickCaseSelector();
+    switchTab('primary');
+    render();
+    setStatus(dom, `Mode active: ${getMode().label} (sin Node.js)`);
+}
+
+function applyQuickCase() {
+    const cases = getQuickCasesByMode(state.workspace.mode);
+    const selected = cases.find((item) => item.id === dom.quickCaseSelect.value);
+    if (!selected) return;
+
+    state.workspace.codes[getMode().primaryKey] = selected.code;
+    state.workspace.currentTab = 'primary';
+    persistWorkspace();
+    switchTab('primary');
+    render();
+    setStatus(dom, `Quick case loaded: ${selected.label}`);
+}
+
+function buildGoalProject() {
+    const goalId = dom.goalSelect.value;
+    const preset = getGoalPreset(state.workspace.mode, goalId);
+
+    state.workspace.codes[getMode().primaryKey] = preset.primary;
+    state.workspace.codes.css = preset.css;
+    state.workspace.codes.html = preset.html;
+    state.workspace.currentTab = 'primary';
+
+    persistWorkspace();
+    switchTab('primary');
+    render();
+    setStatus(dom, `Goal loaded: ${goalId}`);
 }
 
 function downloadProject() {
-    const file = buildDownloadHtml(state.workspace.codes);
+    const file = buildDownloadHtml(state.workspace);
     const blob = new Blob([file], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'opncode-export.html';
+    link.download = `opncode-${getMode().id}-export.html`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -72,8 +179,49 @@ function downloadProject() {
     setStatus(dom, 'Project downloaded');
 }
 
+function exportData() {
+    const payload = exportStoragePayload();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `opncode-data-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setStatus(dom, 'Data exported');
+}
+
+function importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.addEventListener('change', async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const payload = JSON.parse(text);
+            const workspace = importStoragePayload(payload);
+            state.workspace = workspace;
+            refreshProjectSelector();
+            setActiveMode(dom, state.workspace.mode);
+            refreshQuickCaseSelector();
+            switchTab(state.workspace.currentTab || 'primary');
+            render();
+            setStatus(dom, 'Data imported');
+        } catch (error) {
+            setStatus(dom, `Import failed: ${error.message || 'invalid file'}`);
+        }
+    });
+    input.click();
+}
+
 function resetWorkspace() {
-    const accepted = window.confirm('Se limpiara el proyecto guardado y se restaurara la plantilla inicial. Continuar?');
+    const accepted = window.confirm('Se limpiara todo el almacenamiento avanzado y se reiniciara la plataforma. Continuar?');
     if (!accepted) return;
 
     clearWorkspaceStorage();
@@ -81,7 +229,7 @@ function resetWorkspace() {
 }
 
 async function copyCurrentCode() {
-    const code = state.workspace.codes[state.workspace.currentFile] || '';
+    const code = state.workspace.codes[getFileKey()] || '';
     try {
         await navigator.clipboard.writeText(code);
         setStatus(dom, 'Code copied');
@@ -96,14 +244,12 @@ function applyTemplate() {
     if (!template) return;
 
     state.workspace.codes = {
-        jsx: template.codes.jsx || DEFAULT_CODES.jsx,
-        css: template.codes.css || DEFAULT_CODES.css,
-        html: template.codes.html || DEFAULT_CODES.html
+        ...DEFAULT_CODES,
+        ...(template.codes || {})
     };
-    state.workspace.currentFile = 'jsx';
-
+    state.workspace.currentTab = 'primary';
     persistWorkspace();
-    switchFile('jsx');
+    switchTab('primary');
     render();
     setStatus(dom, `Template loaded: ${template.label}`);
 }
@@ -114,12 +260,82 @@ function toggleAutoRefresh() {
     setStatus(dom, state.autoRefreshEnabled ? 'Auto refresh enabled' : 'Auto refresh paused');
 }
 
+function createNewProject() {
+    const name = window.prompt('Nombre del nuevo proyecto:');
+    if (!name) return;
+
+    const created = createProject(name, state.workspace);
+    const loaded = setActiveProject(created.id);
+    if (!loaded) return;
+
+    state.workspace = loaded;
+    refreshProjectSelector();
+    setActiveMode(dom, state.workspace.mode);
+    refreshQuickCaseSelector();
+    switchTab(state.workspace.currentTab || 'primary');
+    render();
+    setStatus(dom, `Project created: ${name}`);
+}
+
+function saveCurrentProject() {
+    persistWorkspace();
+    refreshProjectSelector();
+    setStatus(dom, 'Project snapshot saved');
+}
+
+function deleteCurrentProject() {
+    const projectId = dom.projectSelect.value;
+    const accepted = window.confirm('Eliminar proyecto seleccionado?');
+    if (!accepted) return;
+
+    const ok = deleteProject(projectId);
+    if (!ok) {
+        setStatus(dom, 'Cannot delete last project');
+        return;
+    }
+
+    const activeId = getActiveProjectIdSafe();
+    const loaded = setActiveProject(activeId);
+    if (!loaded) return;
+
+    state.workspace = loaded;
+    refreshProjectSelector();
+    setActiveMode(dom, state.workspace.mode);
+    refreshQuickCaseSelector();
+    switchTab(state.workspace.currentTab || 'primary');
+    render();
+    setStatus(dom, 'Project deleted');
+}
+
+function onProjectChange() {
+    const loaded = setActiveProject(dom.projectSelect.value);
+    if (!loaded) return;
+
+    state.workspace = loaded;
+    setActiveMode(dom, state.workspace.mode);
+    refreshQuickCaseSelector();
+    switchTab(state.workspace.currentTab || 'primary');
+    render();
+    setStatus(dom, 'Project loaded');
+}
+
 function bindEvents() {
     dom.runBtn.addEventListener('click', render);
+    dom.repairBtn.addEventListener('click', repairCurrentPrimaryCode);
+    dom.runModeBtn.addEventListener('click', runCurrentModeOnly);
     dom.copyCodeBtn.addEventListener('click', copyCurrentCode);
+    dom.applyQuickCaseBtn.addEventListener('click', applyQuickCase);
+    dom.buildGoalBtn.addEventListener('click', buildGoalProject);
     dom.applyTemplateBtn.addEventListener('click', applyTemplate);
     dom.toggleAutoRefreshBtn.addEventListener('click', toggleAutoRefresh);
     dom.resetBtn.addEventListener('click', resetWorkspace);
+
+    dom.newProjectBtn.addEventListener('click', createNewProject);
+    dom.saveProjectBtn.addEventListener('click', saveCurrentProject);
+    dom.deleteProjectBtn.addEventListener('click', deleteCurrentProject);
+    dom.exportDataBtn.addEventListener('click', exportData);
+    dom.importDataBtn.addEventListener('click', importData);
+    dom.projectSelect.addEventListener('change', onProjectChange);
 
     dom.clearConsoleBtn.addEventListener('click', () => {
         clearConsole(dom);
@@ -133,6 +349,10 @@ function bindEvents() {
             dom.togglePreviewBtn.textContent = 'Full View';
             setStatus(dom, `Layout: ${button.dataset.layout}`);
         });
+    });
+
+    dom.modeButtons.forEach((button) => {
+        button.addEventListener('click', () => applyMode(button.dataset.mode));
     });
 
     dom.growPreviewBtn.addEventListener('click', () => state.layout.growPreview());
@@ -151,7 +371,7 @@ function bindEvents() {
     });
 
     document.querySelectorAll('.tab').forEach((tab) => {
-        tab.addEventListener('click', () => switchFile(tab.dataset.file));
+        tab.addEventListener('click', () => switchTab(tab.dataset.file));
     });
 
     document.addEventListener('keydown', (event) => {
@@ -162,7 +382,7 @@ function bindEvents() {
 
         if (event.ctrlKey && event.key.toLowerCase() === 's') {
             event.preventDefault();
-            downloadProject();
+            saveCurrentProject();
         }
 
         if (event.ctrlKey && event.key.toLowerCase() === 'b') {
@@ -176,9 +396,9 @@ async function bootstrap() {
     try {
         const editorSetup = await createEditor({
             codes: state.workspace.codes,
-            currentFile: state.workspace.currentFile,
+            currentFile: getFileKey(state.workspace.currentTab),
             onCodeChange: (value) => {
-                state.workspace.codes[state.workspace.currentFile] = value;
+                state.workspace.codes[getFileKey()] = value;
                 persistWorkspace();
             },
             onCodeChangeDebounced: render
@@ -202,14 +422,15 @@ async function bootstrap() {
 
         state.messageHandler = createPreviewMessageHandler(dom.frame, (type, msg) => {
             appendConsoleLine(dom, type, msg);
-            if (type === 'error') {
-                setStatus(dom, 'Render error');
-            }
+            if (type === 'error') setStatus(dom, 'Render error');
         });
         window.addEventListener('message', state.messageHandler);
 
         bindEvents();
-        switchFile(state.workspace.currentFile);
+        refreshProjectSelector();
+        refreshQuickCaseSelector();
+        setActiveMode(dom, state.workspace.mode);
+        switchTab(state.workspace.currentTab || 'primary');
         updateAutoRefreshButton();
         render();
         startAutoRefresh();

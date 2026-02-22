@@ -16,6 +16,21 @@
             <span>OpnCode Studio - <small id="active-file-label">App.jsx</small></span>
         </div>
         <div class="header-right">
+            <select id="project-select" class="control-select"></select>
+            <button class="btn btn-secondary" id="new-project-btn">New Project</button>
+            <button class="btn btn-secondary" id="save-project-btn">Save Project</button>
+            <button class="btn btn-secondary" id="delete-project-btn">Delete Project</button>
+            <button class="btn btn-secondary" id="export-data-btn">Export Data</button>
+            <button class="btn btn-secondary" id="import-data-btn">Import Data</button>
+            <select id="goal-select" class="control-select">
+                <option value="landing">Landing Completa</option>
+                <option value="dashboard">Dashboard Admin</option>
+                <option value="ecommerce">Ecommerce Store</option>
+                <option value="portfolio">Portfolio Pro</option>
+            </select>
+            <button class="btn btn-secondary" id="build-goal-btn">Build Goal</button>
+            <select id="quick-case-select" class="control-select"></select>
+            <button class="btn btn-secondary" id="apply-quick-case-btn">Quick Case</button>
             <select id="template-select" class="control-select">
                 <option value="starter">Starter</option>
                 <option value="dashboard">Dashboard</option>
@@ -23,6 +38,8 @@
             </select>
             <button class="btn btn-secondary" id="apply-template-btn">Template</button>
             <button class="btn btn-run" id="run-btn">Run</button>
+            <button class="btn btn-secondary" id="repair-btn">Repair</button>
+            <button class="btn btn-secondary" id="run-mode-btn">Run Mode</button>
             <button class="btn btn-secondary" id="toggle-auto-refresh-btn">Auto On</button>
             <button class="btn btn-secondary" id="copy-code-btn">Copy</button>
             <button class="btn btn-secondary" id="reset-btn">Reset</button>
@@ -31,6 +48,12 @@
             <button class="btn btn-save" id="download-btn">Download</button>
         </div>
     </header>
+    <section class="mode-panel" id="mode-panel">
+        <button class="mode-btn" data-mode="vanilla">1) Preview HTML/CSS/JS</button>
+        <button class="mode-btn" data-mode="jsx">2) JSX/CSS/HTML</button>
+        <button class="mode-btn" data-mode="tsx">3) TSX/CSS/HTML</button>
+        <button class="mode-btn" data-mode="auto">4) Auto Smart</button>
+    </section>
 
     <main class="main-content">
         <aside class="activity-bar">
@@ -43,7 +66,7 @@
         <div class="editor-master">
             <div id="editor-pane" class="split">
                 <div class="tabs">
-                    <button class="tab active" data-file="jsx">App.jsx</button>
+                    <button class="tab active" data-file="primary" id="primary-tab-label">App.jsx</button>
                     <button class="tab" data-file="css">style.css</button>
                     <button class="tab" data-file="html">index.html</button>
                 </div>
