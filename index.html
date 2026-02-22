@@ -1,0 +1,86 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpnCode Studio | React Playground</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.min.css">
+    <link rel="stylesheet" href="src/styles/app.css">
+</head>
+<body>
+<div class="app-container">
+    <header class="vs-header">
+        <div class="header-left">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/9/9a/Visual_Studio_Code_1.35_icon.svg" width="18" alt="VS Code logo">
+            <span>OpnCode Studio - <small id="active-file-label">App.jsx</small></span>
+        </div>
+        <div class="header-right">
+            <select id="template-select" class="control-select">
+                <option value="starter">Starter</option>
+                <option value="dashboard">Dashboard</option>
+                <option value="landing">Landing</option>
+            </select>
+            <button class="btn btn-secondary" id="apply-template-btn">Template</button>
+            <button class="btn btn-run" id="run-btn">Run</button>
+            <button class="btn btn-secondary" id="toggle-auto-refresh-btn">Auto On</button>
+            <button class="btn btn-secondary" id="copy-code-btn">Copy</button>
+            <button class="btn btn-secondary" id="reset-btn">Reset</button>
+            <button class="btn" id="toggle-preview-btn">Full View</button>
+            <button class="btn btn-secondary" id="clear-console-btn">Clear Console</button>
+            <button class="btn btn-save" id="download-btn">Download</button>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <aside class="activity-bar">
+            <div class="icon active" aria-label="Explorer">Files</div>
+            <div class="icon" aria-label="Search">Find</div>
+            <div class="icon" aria-label="Packages">Pkg</div>
+            <div class="icon" aria-label="Settings">Cfg</div>
+        </aside>
+
+        <div class="editor-master">
+            <div id="editor-pane" class="split">
+                <div class="tabs">
+                    <button class="tab active" data-file="jsx">App.jsx</button>
+                    <button class="tab" data-file="css">style.css</button>
+                    <button class="tab" data-file="html">index.html</button>
+                </div>
+                <div id="monaco-container"></div>
+            </div>
+
+            <div id="preview-pane" class="split">
+                <div class="preview-header">
+                    <span>PREVIEW</span>
+                    <div class="preview-controls">
+                        <button class="tiny-btn" id="layout-editor-btn" data-layout="editor">Editor</button>
+                        <button class="tiny-btn" id="layout-balanced-btn" data-layout="balanced">50/50</button>
+                        <button class="tiny-btn active" id="layout-preview-btn" data-layout="preview">Preview</button>
+                        <button class="tiny-btn" id="shrink-preview-btn">-</button>
+                        <button class="tiny-btn" id="grow-preview-btn">+</button>
+                        <button class="tiny-btn" id="toggle-console-btn">Console</button>
+                    </div>
+                </div>
+                <div class="preview-stage">
+                    <div class="iframe-wrapper">
+                        <iframe id="output-frame" title="Resultado en vivo"></iframe>
+                    </div>
+                </div>
+                <div id="console-output"></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="vs-status" id="status-bar">
+        <span id="status-text">Ready</span>
+        <span>UTF-8</span>
+        <span>React + JSX (Babel)</span>
+    </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<script src="https://unpkg.com/split.js/dist/split.min.js"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

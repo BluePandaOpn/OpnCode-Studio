@@ -1,0 +1,3 @@
+﻿/* Archivo puente por compatibilidad.
+   Los estilos reales estan en src/styles/app.css */
+@import url('./src/styles/app.css');
